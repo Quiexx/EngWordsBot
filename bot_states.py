@@ -17,6 +17,7 @@ HELP_INFO = "Я знаю следующие команды:\n" \
 TEST_EXIT_INFO = "Тест отменен"
 EXISTING_TRANSLATION = "Такой перевод уже есть"
 DELETION_TEXT = "Слово удалено"
+CANCEL_WORD_ADDING = "Добавление слова отменено"
 
 
 class BotState:
@@ -55,7 +56,7 @@ class BotState:
             return new_state.start_text()
 
         if command == "/stop":
-            if self.user_state.bot_state_name in (StartTest.__name__, Testing.__name__):
+            if self.user_state.bot_state_name in (StartTest.__name__, Testing.__name__, AddAnotherTranslation.__name__):
                 new_state = NeutralState(self.user_state)
                 self.user_state.bot_state_name = new_state.__class__.__name__
                 return TEST_EXIT_INFO + '\n\n' + new_state.start_text()
@@ -63,7 +64,13 @@ class BotState:
             return 'Нечего отменять🌚\nЕсли что-то хотите отменить, начните тест коммандой /test,' \
                    ' а потом отмените командой /stop 😌' + start_text
 
-        # TODO: выход из добавления слова
+        if command == "/cancel":
+            if self.user_state.bot_state_name in (NewWord.__name__, AddAnotherTranslation.__name__):
+                new_state = NeutralState(self.user_state)
+                self.user_state.bot_state_name = new_state.__class__.__name__
+                return CANCEL_WORD_ADDING + '\n\n' + new_state.start_text()
+
+            return start_text
 
         return False
 
@@ -112,7 +119,8 @@ class Greeting(NeutralState):
 
 class NewWord(BotState):
     def start_text(self):
-        return "Напишите слово, чтобы его добавить для него перевод"
+        return "Напишите слово, чтобы добавить для него перевод\n" \
+               "Чтобы отменить, введите /cancel"
 
     def handle_answer(self, text):
         command = self.handle_commands(text)
@@ -120,21 +128,18 @@ class NewWord(BotState):
             return command
 
         written_word = text.strip()
-        found_word = Words.get(word=written_word)
 
-        if found_word is None:
-            found_word = Words(word=written_word, using_count=0)
+        self.user_state.last_word = written_word
 
-        self.user_state.last_word = found_word.word
-
-        new_state = NewWordTranslations(self.user_state)
+        new_state = NewWordTranslation(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
         return new_state.start_text()
 
 
-class NewWordTranslations(BotState):
+class NewWordTranslation(BotState):
     def start_text(self):
-        return "Добавьте перевод"
+        return "Добавьте перевод\n" \
+               "Чтобы отменить, введите /cancel"
 
     def handle_answer(self, text):
         command = self.handle_commands(text)
@@ -146,6 +151,9 @@ class NewWordTranslations(BotState):
 
         found_word = Words.get(word=word)
         found_translation = Words.get(word=translation)
+
+        if found_word is None:
+            found_word = Words(word=word, using_count=0)
 
         if found_translation is None:
             found_translation = Words(word=translation, using_count=0)
@@ -167,6 +175,26 @@ class NewWordTranslations(BotState):
             self.user_state.dictionary[translation_id].append(word_id)
         else:
             self.user_state.dictionary[translation_id] = [word_id]
+
+        new_state = AddAnotherTranslation(self.user_state)
+        self.user_state.bot_state_name = new_state.__class__.__name__
+        return new_state.start_text()
+
+
+class AddAnotherTranslation(BotState):
+    def start_text(self):
+        return "Хотите добавить еще один вариант перевода? (да/нет)"
+
+    def handle_answer(self, text):
+        command = self.handle_commands(text)
+        if command:
+            return command
+
+        answer = text.strip().lower()
+        if answer in ('да', 'хочу', 'давай'):
+            new_state = NewWordTranslation(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text()
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
@@ -278,7 +306,7 @@ class StartTest(BotState):
         except ValueError:
             return "Вы что-то не то ввели. Нужно написать число\n\n" + self.start_text()
 
-        if count > len(self.user_state.dictionary   .keys()):
+        if count > len(self.user_state.dictionary.keys()):
             return "Слишком много, у вас нет столько слов\n\n" + self.start_text()
 
         test_list = sample(self.user_state.dictionary.keys(), k=count)
