@@ -133,3 +133,6 @@ dmypy.json
 
 #settings
 settings.py
+
+#replit
+.replit

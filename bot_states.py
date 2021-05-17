@@ -1,7 +1,6 @@
 from random import sample
 import re
 
-import pony.orm
 from pony.orm import commit
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from database_models import Words
@@ -194,6 +193,7 @@ class NewWordTranslation(NewWord):
 
         if found_word is None:
             found_word = Words(word=word, using_count=0)
+            commit()
 
         if found_translation is None:
             found_translation = Words(word=translation, using_count=0)
@@ -205,6 +205,11 @@ class NewWordTranslation(NewWord):
         dictionary = self.user_state.dictionary
 
         if word_id in dictionary:
+          if translation_id in dictionary[word_id]:
+            new_state = AddAnotherTranslation(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return "Вы уже добавляли такой перевод\n\n" + new_state.start_text(), new_state.get_keyboard() 
+          else:
             self.user_state.dictionary[word_id].append(translation_id)
         else:
             self.user_state.dictionary[word_id] = [translation_id]
