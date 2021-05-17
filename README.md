@@ -1,9 +1,9 @@
 # EngWordsBot
 
-##VK-bot for learning English words
+## VK-bot for learning English words
 
 ----
-###Available commands:
+### Available commands:
 1) ✍ /new - add new word and translation
 2) 🤔 /remind - remind the translation of a word
 3) 📔 /all - check all added words

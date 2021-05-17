@@ -7,6 +7,8 @@ from random import randint
 import vk_api
 from pony.orm import db_session
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
+
 from bot_states import START_STATE
 import bot_states
 from database_models import UserState, Words
@@ -78,16 +80,20 @@ class Bot:
 
         if user_state is not None:
             bot_state = getattr(bot_states, user_state.bot_state_name)(user_state)
-            text_to_send = bot_state.handle_answer(text)
+            text_to_send, keyboard = bot_state.handle_answer(text)
         else:
             bot_state = getattr(bot_states, START_STATE)(user_state)
             UserState(user_id=str(user_id), bot_state_name=START_STATE, dictionary={})
             text_to_send = bot_state.start_text()
+            keyboard = bot_state.get_keyboard()
+
+        keyboard_to_send = keyboard.get_keyboard() if keyboard else None
 
         self.api.messages.send(
             user_id=event.message.peer_id,
             random_id=randint(0, 2 ** 20),
-            message=text_to_send
+            message=text_to_send,
+            keyboard=keyboard_to_send
         )
 
         log.info("bot sent message to user %d", user_id)

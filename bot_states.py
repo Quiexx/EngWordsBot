@@ -1,11 +1,12 @@
 from random import sample
 
 from pony.orm import commit
+from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 from database_models import Words
 
 HELP_INFO = "Я знаю следующие команды:\n" \
-            "✍ /new - Добавить новое слово и его перевод" \
+            "✍ /new - Добавить новое слово и его перевод\n" \
             "🤔 /remind - Вспомнить перевод добавленного слова.\n" \
             "📔 /all - Посмотреть все добавленные слова.\n" \
             "❌ /delete - Удалить слово\n" \
@@ -28,49 +29,49 @@ class BotState:
         command = text.strip()
 
         if command == "/help":
-            return HELP_INFO + '\n\n' + start_text
+            return HELP_INFO + '\n\n' + start_text, self.get_keyboard()
 
         if command == "/new":
             new_state = NewWord(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
-            return new_state.start_text()
+            return new_state.start_text(), new_state.get_keyboard()
 
         if command == "/delete":
             new_state = DeleteWord(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
-            return new_state.start_text()
+            return new_state.start_text(), new_state.get_keyboard()
 
         if command == "/remind":
             new_state = Remind(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
-            return new_state.start_text()
+            return new_state.start_text(), new_state.get_keyboard()
 
         if command == "/all":
             new_state = CheckAllWords(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
-            return new_state.start_text()
+            return new_state.start_text(), new_state.get_keyboard()
 
         if command == "/test":
             new_state = StartTest(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
-            return new_state.start_text()
+            return new_state.start_text(), new_state.get_keyboard()
 
         if command == "/stop":
             if self.user_state.bot_state_name in (StartTest.__name__, Testing.__name__, AddAnotherTranslation.__name__):
                 new_state = NeutralState(self.user_state)
                 self.user_state.bot_state_name = new_state.__class__.__name__
-                return TEST_EXIT_INFO + '\n\n' + new_state.start_text()
+                return TEST_EXIT_INFO + '\n\n' + new_state.start_text(), new_state.get_keyboard()
 
             return 'Нечего отменять🌚\nЕсли что-то хотите отменить, начните тест коммандой /test,' \
-                   ' а потом отмените командой /stop 😌' + start_text
+                   ' а потом отмените командой /stop 😌' + start_text, self.get_keyboard()
 
         if command == "/cancel":
             if self.user_state.bot_state_name in (NewWord.__name__, AddAnotherTranslation.__name__):
                 new_state = NeutralState(self.user_state)
                 self.user_state.bot_state_name = new_state.__class__.__name__
-                return CANCEL_WORD_ADDING + '\n\n' + new_state.start_text()
+                return CANCEL_WORD_ADDING + '\n\n' + new_state.start_text(), new_state.get_keyboard()
 
-            return start_text
+            return start_text, self.get_keyboard()
 
         return False
 
@@ -80,9 +81,12 @@ class BotState:
     def handle_answer(self, text):
         command = self.handle_commands(text, self.start_text())
         if command:
-            return command
+            return command, self.get_keyboard()
 
-        return self.start_text()
+        return self.start_text(), self.get_keyboard()
+
+    def get_keyboard(self):
+        return None
 
 
 # Neutral state
@@ -96,7 +100,20 @@ class NeutralState(BotState):
         if command:
             return command
 
-        return self.start_text()
+        return self.start_text(), self.get_keyboard()
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('/new', color=VkKeyboardColor.POSITIVE)
+        keyboard.add_button('/delete', color=VkKeyboardColor.NEGATIVE)
+        keyboard.add_line()
+        keyboard.add_button('/remind', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_button('/all', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_button('/help', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_line()
+        keyboard.add_button('/test', color=VkKeyboardColor.PRIMARY)
+        return keyboard
+
 
 
 # Greeting state
@@ -112,7 +129,7 @@ class Greeting(NeutralState):
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return new_state.start_text()
+        return new_state.start_text(), new_state.get_keyboard()
 
 
 # Add new word
@@ -133,7 +150,12 @@ class NewWord(BotState):
 
         new_state = NewWordTranslation(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return new_state.start_text()
+        return new_state.start_text(), new_state.get_keyboard()
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('/cancel', color=VkKeyboardColor.PRIMARY)
+        return keyboard
 
 
 class NewWordTranslation(BotState):
@@ -178,7 +200,12 @@ class NewWordTranslation(BotState):
 
         new_state = AddAnotherTranslation(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return new_state.start_text()
+        return new_state.start_text(), new_state.get_keyboard()
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('/cancel', color=VkKeyboardColor.PRIMARY)
+        return keyboard
 
 
 class AddAnotherTranslation(BotState):
@@ -191,14 +218,20 @@ class AddAnotherTranslation(BotState):
             return command
 
         answer = text.strip().lower()
-        if answer in ('да', 'хочу', 'давай'):
+        if answer in ('да', 'хочу', 'давай', 'yes'):
             new_state = NewWordTranslation(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
-            return new_state.start_text()
+            return new_state.start_text(), new_state.get_keyboard()
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return new_state.start_text()
+        return new_state.start_text(), new_state.get_keyboard()
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('Да', color=VkKeyboardColor.POSITIVE)
+        keyboard.add_button('Нет', color=VkKeyboardColor.NEGATIVE)
+        return keyboard
 
 
 # Remind word's translation
@@ -231,7 +264,8 @@ class Remind(BotState):
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return text_to_send + '\n\n' + new_state.start_text()
+        return text_to_send + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
 
 
 # Delete word
@@ -263,7 +297,8 @@ class DeleteWord(BotState):
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return DELETION_TEXT + '\n' + new_state.start_text()
+        return DELETION_TEXT + '\n' + new_state.start_text(), new_state.get_keyboard()
+
 
 
 # Check all added words
@@ -286,7 +321,10 @@ class CheckAllWords(BotState):
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return new_state.start_text()
+        return new_state.start_text(), new_state.get_keyboard()
+
+    def get_keyboard(self):
+        return NeutralState(self.user_state).get_keyboard()
 
 
 # Start test
@@ -316,7 +354,13 @@ class StartTest(BotState):
 
         new_state = Testing(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return new_state.start_text()
+        return new_state.start_text(), new_state.get_keyboard()
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('/stop', color=VkKeyboardColor.NEGATIVE)
+
+        return keyboard
 
 
 class Testing(BotState):
@@ -354,9 +398,14 @@ class Testing(BotState):
             return text_to_send + \
                    "Тест окончен!\n" \
                    f"Ваш результат: {self.user_state.test_list['correct']}/{self.user_state.test_list['count']}\n\n" \
-                   + new_state.start_text()
+                   + new_state.start_text(), new_state.get_keyboard()
 
-        return text_to_send + self.start_text()
+        return text_to_send + self.start_text(), self.get_keyboard()
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('/stop', color=VkKeyboardColor.NEGATIVE)
+        return keyboard
 
 
 START_STATE = Greeting.__name__
