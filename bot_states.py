@@ -1,6 +1,7 @@
 from random import sample
 import re
 
+import pony.orm
 from pony.orm import commit
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from database_models import Words
