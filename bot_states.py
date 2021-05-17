@@ -381,7 +381,7 @@ class CheckAllWords(BotState):
         all_words = self.get_word_list()
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return f"Всего {word_count} слов:\n\n" + all_words + '\n\n' + new_state.start_text()
+        return f"Всего слов: {word_count}\n\n" + all_words + '\n\n' + new_state.start_text()
 
     def handle_answer(self, text):
         command = self.handle_commands(text)
@@ -394,10 +394,14 @@ class CheckAllWords(BotState):
 
     def get_word_list(self):
         all_words = ''
+        words = []
         for word_id, transl_indices in self.user_state.dictionary.items():
-            word = Words.get(id=int(word_id)).word
-            translations = [Words.get(id=int(id)).word for id in transl_indices]
-            all_words += f"{word} - {', '.join(translations)}\n"
+          word = Words.get(id=int(word_id)).word
+          translations = [Words.get(id=int(id)).word for id in transl_indices]
+          words.append((word, ', '.join(translations)))
+
+        for (word, translations) in sorted(words):
+            all_words += f"{word} - {translations}\n"
 
         return all_words
 
