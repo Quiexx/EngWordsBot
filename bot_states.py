@@ -1,6 +1,7 @@
 from random import sample
 import re
 
+import pony.orm
 from pony.orm import commit
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from database_models import Words
@@ -203,17 +204,17 @@ class NewWordTranslation(NewWord):
 
         dictionary = self.user_state.dictionary
 
-        # TODO: сделать подсчет кол-ва юзеров, использующих слово
-
         if word_id in dictionary:
             self.user_state.dictionary[word_id].append(translation_id)
         else:
             self.user_state.dictionary[word_id] = [translation_id]
+            found_word.using_count += 1
 
         if translation_id in dictionary:
             self.user_state.dictionary[translation_id].append(word_id)
         else:
             self.user_state.dictionary[translation_id] = [word_id]
+            found_translation.using_count += 1
 
         new_state = AddAnotherTranslation(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
@@ -324,11 +325,18 @@ class DeleteWord(BotState):
         transl_indices = self.user_state.dictionary[word_id]
         self.user_state.dictionary.pop(word_id)
 
+        word.using_count -= 1
+        if word.using_count == 0:
+            Words.delete(word)
+
         for transl_id in transl_indices:
-            print(transl_id, type(transl_id))
             self.user_state.dictionary[transl_id].remove(word_id)
             if not self.user_state.dictionary[transl_id]:
                 self.user_state.dictionary.pop(transl_id)
+                translation = Words.get(id=int(transl_id))
+                translation.using_count -= 1
+                if translation.using_count == 0:
+                    Words.delete(translation)
 
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
@@ -336,11 +344,28 @@ class DeleteWord(BotState):
 
     def handle_commands(self, text):
         command = text.strip()
-        if command == "/cancel":
+        if command in ("/cancel", "❌ Отменить"):
             new_state = NeutralState(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return CANCEL_DELETE + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
+        if command in ("/remind", "🤔 Напомнить"):
+            new_state = Remind(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
+
+        if command in ("/all", "📔 Все слова"):
+            new_state = CheckAllWords(self.user_state)
+            return new_state.get_word_list() + '\n\n' + self.start_text(), self.get_keyboard()
         return False
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('❌ Отменить', color=VkKeyboardColor.PRIMARY)
+        keyboard.add_line()
+        keyboard.add_button('🤔 Напомнить', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_button('📔 Все слова', color=VkKeyboardColor.SECONDARY)
+        return keyboard
 
 
 # Check all added words
