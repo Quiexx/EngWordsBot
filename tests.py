@@ -18,13 +18,14 @@ def isolate_db(test_func):
     return wrapper
 
 
+@isolate_db
 class Test(TestCase):
     RAW_EVENT = {'type': 'message_new',
                  'object': {'message': {'date': 1616486994,
-                                        'from_id': 111111111,
+                                        'from_id': 1,
                                         'id': 71,
                                         'out': 0,
-                                        'peer_id': 111111111,
+                                        'peer_id': 1,
                                         'text': 'gg',
                                         'conversation_message_id': 64,
                                         'fwd_messages': [],
@@ -58,6 +59,8 @@ class Test(TestCase):
         '/help',
         'random message',
         '/new',
+        'word',
+        'нет',
         '/delete',
         '/remind',
         '/test',
@@ -68,6 +71,8 @@ class Test(TestCase):
         bot_states.HELP_INFO + '\n\n',
         bot_states.NeutralState(user_state_mock).start_text(),
         bot_states.NewWord(user_state_mock).start_text(),
+        bot_states.NewWordTranslation(user_state_mock).start_text(),
+        bot_states.AddAnotherTranslation(user_state_mock).start_text(),
         bot_states.DeleteWord(user_state_mock).start_text(),
         bot_states.Remind(user_state_mock).start_text(),
         bot_states.StartTest(user_state_mock).start_text(),
@@ -91,7 +96,6 @@ class Test(TestCase):
                 bot.on_event.assert_any_call(obj)
                 assert bot.on_event.call_count == count
 
-    @isolate_db
     def test_greeting(self):
         send_mock = Mock()
         api_mock = Mock()
@@ -119,7 +123,6 @@ class Test(TestCase):
 
         assert real_outputs == self.GREETING_EXPECTED_OUTPUTS
 
-    @isolate_db
     def test_commands(self):
         send_mock = Mock()
         api_mock = Mock()
