@@ -10,11 +10,7 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from bot_states import START_STATE
 import bot_states
 from database_models import UserState
-
-try:
-    import settings
-except ImportError:
-    exit('DO cp settings.py.default settings.py and set group id and token')
+import settings
 
 log = logging.getLogger("bot")
 
@@ -58,7 +54,7 @@ class Bot:
             try:
                 self.on_event(event)
             except Exception as exc:
-                log.exception("Event processing error")
+                log.exception(f"Event processing error: {exc}")
 
     @db_session
     def on_event(self, event):
@@ -93,7 +89,7 @@ class Bot:
             keyboard=keyboard_to_send
         )
 
-        log.info("bot sent message to user %d", user_id)
+        # log.info("bot sent message to user %d", user_id)
 
 
 if __name__ == '__main__':
@@ -101,3 +97,5 @@ if __name__ == '__main__':
     bot = Bot(settings.GROUP_ID, settings.TOKEN)
 
     bot.run()
+
+
