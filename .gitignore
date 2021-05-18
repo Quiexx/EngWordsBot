@@ -133,3 +133,11 @@ dmypy.json
 
 #settings
 settings.py
+
+#replit
+.replit
+
+#database
+.sqlite
+.sqlite3
+EngWords_database.sqlite

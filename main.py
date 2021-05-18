@@ -1,4 +1,3 @@
-#!/python_environments/vk_chat_bot_venv python3
 
 # В settings.py хранится токен и id группы
 import logging
@@ -7,11 +6,10 @@ from random import randint
 import vk_api
 from pony.orm import db_session
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 from bot_states import START_STATE
 import bot_states
-from database_models import UserState, Words
+from database_models import UserState
 import keep_alive
 
 try:
@@ -103,6 +101,6 @@ if __name__ == '__main__':
     log_configure()
     bot = Bot(settings.GROUP_ID, settings.TOKEN)
 
-    # keep_alive.keep_alive()
+    keep_alive.keep_alive()
 
     bot.run()

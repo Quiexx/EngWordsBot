@@ -21,7 +21,7 @@ CANCEL_WORD_ADDING = "Добавление слова отменено"
 CANCEL_REMIND = "Напоминание отменено"
 CANCEL_DELETE = "Удаление отменено"
 
-WORDS_RE = re.compile('[A-Za-zА-Яа-яЁё\s]+')
+WORDS_RE = re.compile('[A-Za-zА-Яа-яЁё\s-]+')
 
 class BotState:
     def __init__(self, user_state):
@@ -193,6 +193,7 @@ class NewWordTranslation(NewWord):
 
         if found_word is None:
             found_word = Words(word=word, using_count=0)
+            commit()
 
         if found_translation is None:
             found_translation = Words(word=translation, using_count=0)
@@ -206,6 +207,11 @@ class NewWordTranslation(NewWord):
         # TODO: сделать подсчет кол-ва юзеров, использующих слово
 
         if word_id in dictionary:
+          if translation_id in dictionary[word_id]:
+            new_state = AddAnotherTranslation(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return "Вы уже добавляли такой перевод\n\n" + new_state.start_text(), new_state.get_keyboard() 
+          else:
             self.user_state.dictionary[word_id].append(translation_id)
         else:
             self.user_state.dictionary[word_id] = [translation_id]
@@ -351,7 +357,7 @@ class CheckAllWords(BotState):
         all_words = self.get_word_list()
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
-        return f"Всего {word_count} слов:\n\n" + all_words + '\n\n' + new_state.start_text()
+        return f"Всего слов: {word_count}\n\n" + all_words + '\n\n' + new_state.start_text()
 
     def handle_answer(self, text):
         command = self.handle_commands(text)
@@ -364,10 +370,14 @@ class CheckAllWords(BotState):
 
     def get_word_list(self):
         all_words = ''
+        words = []
         for word_id, transl_indices in self.user_state.dictionary.items():
-            word = Words.get(id=int(word_id)).word
-            translations = [Words.get(id=int(id)).word for id in transl_indices]
-            all_words += f"{word} - {', '.join(translations)}\n"
+          word = Words.get(id=int(word_id)).word
+          translations = [Words.get(id=int(id)).word for id in transl_indices]
+          words.append((word, ', '.join(translations)))
+
+        for (word, translations) in sorted(words):
+            all_words += f"{word} - {translations}\n"
 
         return all_words
 
