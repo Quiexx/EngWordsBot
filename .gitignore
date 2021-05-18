@@ -132,7 +132,7 @@ dmypy.json
 .idea/
 
 #settings
-settings.py
+#settings.py
 
 #replit
 .replit
