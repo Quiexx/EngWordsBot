@@ -10,7 +10,6 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from bot_states import START_STATE
 import bot_states
 from database_models import UserState
-import keep_alive
 
 try:
     import settings
@@ -100,7 +99,5 @@ class Bot:
 if __name__ == '__main__':
     log_configure()
     bot = Bot(settings.GROUP_ID, settings.TOKEN)
-
-    keep_alive.keep_alive()
 
     bot.run()
