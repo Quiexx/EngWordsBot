@@ -140,3 +140,4 @@ settings.py
 #database
 .sqlite
 .sqlite3
+EngWords_database.sqlite

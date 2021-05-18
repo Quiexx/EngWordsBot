@@ -21,7 +21,7 @@ CANCEL_WORD_ADDING = "Добавление слова отменено"
 CANCEL_REMIND = "Напоминание отменено"
 CANCEL_DELETE = "Удаление отменено"
 
-WORDS_RE = re.compile('[A-Za-zА-Яа-яЁё\s]+')
+WORDS_RE = re.compile('[A-Za-zА-Яа-яЁё\s-]+')
 
 class BotState:
     def __init__(self, user_state):
