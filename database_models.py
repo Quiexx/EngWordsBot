@@ -1,4 +1,4 @@
-from pony.orm import Database, Required, Json, Optional, IntArray
+from pony.orm import Database, Required, Json, Optional
 
 from settings import DB_CONFIG
 

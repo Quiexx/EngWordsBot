@@ -7,6 +7,7 @@ itsdangerous==2.0.0
 Jinja2==3.0.0
 MarkupSafe==2.0.0
 pony==0.7.14
+PyMySQL==1.0.2
 requests==2.25.1
 six==1.16.0
 urllib3==1.26.4
