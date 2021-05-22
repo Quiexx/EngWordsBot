@@ -8,7 +8,7 @@ from database_models import Words
 HELP_INFO = "Я знаю следующие команды:\n" \
             "✍ /new - Добавить новое слово и его перевод\n" \
             "🤔 /remind - Вспомнить перевод добавленного слова.\n" \
-            "📔 /all - Посмотреть все добавленные слова.\n" \
+            "📔 /words - Посмотреть все добавленные слова.\n" \
             "❌ /delete - Удалить слово\n" \
             "📝 /test - Начать тест. Во время теста я буду выбирать случайные слова из тех, что вы " \
             "добавили, писать его русский или английский вариант, а вы должны написать перевод.\n" \
@@ -19,9 +19,12 @@ EXISTING_TRANSLATION = "Такой перевод уже есть"
 DELETION_TEXT = "Слово удалено"
 CANCEL_WORD_ADDING = "Добавление слова отменено"
 CANCEL_REMIND = "Напоминание отменено"
+CANCEL_ALL_WORDS = "Просмотр слов отменен"
 CANCEL_DELETE = "Удаление отменено"
+SHOW_COUNT = 15
 
 WORDS_RE = re.compile('[A-Za-zА-Яа-яЁё\s-]+')
+
 
 class BotState:
     def __init__(self, user_state):
@@ -74,7 +77,7 @@ class NeutralState(BotState):
             self.user_state.bot_state_name = new_state.__class__.__name__
             return new_state.start_text(), new_state.get_keyboard()
 
-        if command in ("/all", "Все слова"):
+        if command in ("/words", "Все слова"):
             new_state = CheckAllWords(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return new_state.start_text(), new_state.get_keyboard()
@@ -135,7 +138,7 @@ class NewWord(BotState):
                    "Можно вводить только русские и английские буквы\n\n" \
                    + self.start_text(), self.get_keyboard()
 
-        self.user_state.last_word = written_word
+        self.user_state.buffer = {"word": written_word}
 
         new_state = NewWordTranslation(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
@@ -144,18 +147,22 @@ class NewWord(BotState):
     def handle_commands(self, text):
         command = text.strip()
         if command in ("/cancel", "❌ Отменить"):
+            self.user_state.buffer.clear()
             new_state = NeutralState(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return CANCEL_WORD_ADDING + '\n\n' + new_state.start_text(), new_state.get_keyboard()
 
         if command in ("/remind", "🤔 Напомнить"):
+            self.user_state.buffer.clear()
             new_state = Remind(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return new_state.start_text(), new_state.get_keyboard()
 
-        if command in ("/all", "📔 Все слова"):
+        if command in ("/words", "📔 Все слова"):
+            self.user_state.buffer.clear()
             new_state = CheckAllWords(self.user_state)
-            return new_state.get_word_list() + '\n\n' + self.start_text(), self.get_keyboard()
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
 
         return False
 
@@ -170,8 +177,8 @@ class NewWord(BotState):
 
 class NewWordTranslation(NewWord):
     def start_text(self):
-
-        return f'Добавьте перевод для "{self.user_state.last_word}"\n' \
+        word = self.user_state.buffer["word"]
+        return f'Добавьте перевод для "{word}"\n' \
                "Чтобы отменить, введите /cancel или нажмите на кнопочку"
 
     def handle_answer(self, text):
@@ -179,7 +186,8 @@ class NewWordTranslation(NewWord):
         if command:
             return command
 
-        word = self.user_state.last_word
+        word = self.user_state.buffer["word"]
+
         translation = text.strip()
 
         if WORDS_RE.fullmatch(translation) is None:
@@ -205,12 +213,12 @@ class NewWordTranslation(NewWord):
         dictionary = self.user_state.dictionary
 
         if word_id in dictionary:
-          if translation_id in dictionary[word_id]:
-            new_state = AddAnotherTranslation(self.user_state)
-            self.user_state.bot_state_name = new_state.__class__.__name__
-            return "Вы уже добавляли такой перевод\n\n" + new_state.start_text(), new_state.get_keyboard()
-          else:
-            self.user_state.dictionary[word_id].append(translation_id)
+            if translation_id in dictionary[word_id]:
+                new_state = AddAnotherTranslation(self.user_state)
+                self.user_state.bot_state_name = new_state.__class__.__name__
+                return "Вы уже добавляли такой перевод\n\n" + new_state.start_text(), new_state.get_keyboard()
+            else:
+                self.user_state.dictionary[word_id].append(translation_id)
         else:
             self.user_state.dictionary[word_id] = [translation_id]
             found_word.using_count += 1
@@ -241,6 +249,7 @@ class AddAnotherTranslation(NewWord):
             self.user_state.bot_state_name = new_state.__class__.__name__
             return new_state.start_text(), new_state.get_keyboard()
 
+        self.user_state.buffer.clear()
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
         return new_state.start_text(), new_state.get_keyboard()
@@ -265,8 +274,6 @@ class Remind(BotState):
         command = self.handle_commands(text)
         if command:
             return command
-
-
 
         word = text.strip()
         if WORDS_RE.fullmatch(word) is None:
@@ -295,11 +302,17 @@ class Remind(BotState):
 
     def handle_commands(self, text):
         command = text.strip()
-        if command == "/cancel":
+        if command in ("/cancel", "❌ Отменить"):
             new_state = NeutralState(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return CANCEL_REMIND + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
         return False
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('❌ Отменить', color=VkKeyboardColor.PRIMARY)
+        return keyboard
 
 
 # Delete word
@@ -361,7 +374,8 @@ class DeleteWord(BotState):
 
         if command in ("/all", "📔 Все слова"):
             new_state = CheckAllWords(self.user_state)
-            return new_state.get_word_list() + '\n\n' + self.start_text(), self.get_keyboard()
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
         return False
 
     def get_keyboard(self):
@@ -378,10 +392,21 @@ class DeleteWord(BotState):
 class CheckAllWords(BotState):
     def start_text(self):
         word_count = len(self.user_state.dictionary.keys())
-        all_words = self.get_word_list()
-        new_state = NeutralState(self.user_state)
-        self.user_state.bot_state_name = new_state.__class__.__name__
-        return f"Всего слов: {word_count}\n\n" + all_words + '\n\n' + new_state.start_text()
+
+        if word_count == 0:
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return "Вы еще не добавили слова\n" \
+                   'Чтобы добавить слово, напишите /new\n' \
+                   'или нажмите на кнопку "Добавить"' \
+                   + '\n\n' + new_state.start_text()
+
+        self.user_state.buffer.update({"word_count": word_count})
+        return f"Всего слов: {word_count}\n\n" \
+               f'🟢 /all (кнопка "📖 Показать все")\n\tпоказать все слова в алфавитном порядке\n' \
+               f'🟢 /letter (кнопка "🔍 Найти по буквам")\n\tнайти слово по первой(ым) букве(ам)\n' \
+               f'🟢 /cancel (кнопка "❌ Отменить")\n\tотменить просмотр слов\n'
 
     def handle_answer(self, text):
         command = self.handle_commands(text)
@@ -392,21 +417,239 @@ class CheckAllWords(BotState):
         self.user_state.bot_state_name = new_state.__class__.__name__
         return new_state.start_text(), new_state.get_keyboard()
 
-    def get_word_list(self):
-        all_words = ''
-        words = []
-        for word_id, transl_indices in self.user_state.dictionary.items():
-          word = Words.get(id=int(word_id)).word
-          translations = [Words.get(id=int(id)).word for id in transl_indices]
-          words.append((word, ', '.join(translations)))
+    def handle_commands(self, text):
+        command = text.strip()
 
-        for (word, translations) in sorted(words):
-            all_words += f"{word} - {translations}\n"
+        if command in ("/cancel", "❌ Отменить"):
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return CANCEL_ALL_WORDS + '\n\n' + new_state.start_text(), new_state.get_keyboard()
 
-        return all_words
+        if command in ("/all", "📖 Показать все"):
+            new_state = ShowAll(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
+
+        if command in ("/letter", "🔍 Найти по буквам"):
+            self.user_state.buffer.clear()
+            new_state = WriteToFind(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
+
+        return False
 
     def get_keyboard(self):
-        return NeutralState(self.user_state).get_keyboard()
+        keyboard = VkKeyboard(one_time=True)
+
+        word_count = len(self.user_state.dictionary.keys())
+        if word_count == 0:
+            new_state = NeutralState(self.user_state)
+            return new_state.get_keyboard()
+
+        keyboard.add_button('📖 Показать все', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_button('🔍 Найти по буквам', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_line()
+        keyboard.add_button('❌ Отменить', color=VkKeyboardColor.PRIMARY)
+        return keyboard
+
+
+class ShowAll(BotState):
+    def start_text(self):
+        word_count = self.user_state.buffer["word_count"]
+
+        if "from_word_idx" in self.user_state.buffer.keys():
+            from_idx = self.user_state.buffer["from_word_idx"]
+        else:
+            from_idx = 0
+            self.user_state.buffer["from_word_idx"] = 0
+
+        all_words, all_count = self.get_word_list(from_idx)
+
+        if all_count == SHOW_COUNT and from_idx + SHOW_COUNT < word_count:
+            text = f'Еще слов: {word_count - from_idx - SHOW_COUNT}\n' \
+                   f'Чтобы показать еще, введите /more\n' \
+                   f'Чтобы отменить показ слов, введите /cancel\n'
+        else:
+            text = "Это все слова"
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return ''.join(all_words) + '\n\n' + text + "\n\n" + new_state.start_text()
+
+        return ''.join(all_words) + '\n\n' + text
+
+    def handle_answer(self, text):
+
+        command = self.handle_commands(text)
+        if command:
+            return command
+
+        new_state = ShowAll(self.user_state)
+        self.user_state.bot_state_name = new_state.__class__.__name__
+        return "Кажется, вы ввели что-то не то\n\n" + new_state.start_text(), new_state.get_keyboard()
+
+    def handle_commands(self, text):
+        command = text.strip()
+
+        if command in ("/cancel", "❌ Отменить"):
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return CANCEL_ALL_WORDS + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
+        if command in ("/more", "📖 Показать еще"):
+            self.user_state.buffer["from_word_idx"] += SHOW_COUNT
+            new_state = ShowAll(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
+
+        return False
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+
+        if "word_count" not in self.user_state.buffer:
+            new_state = NeutralState(self.user_state)
+            return new_state.get_keyboard()
+
+        keyboard.add_button('📖 Показать еще', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_line()
+        keyboard.add_button('❌ Отменить', color=VkKeyboardColor.PRIMARY)
+        return keyboard
+
+    def get_word_list(self, from_idx):
+        all_words = ''
+        count = 0
+        word_ids = [int(id) for id in self.user_state.dictionary.keys()]
+        words = Words.select(lambda x: x.id in word_ids).order_by(Words.word)[from_idx: from_idx + SHOW_COUNT]
+        for word in words:
+            count += 1
+            transl_ids = [int(id) for id in self.user_state.dictionary[str(word.id)]]
+            transls = [Words.get(id=int(id)).word for id in transl_ids]
+            all_words += f"{word.word} - {', '.join(transls)}\n"
+        return all_words, count
+
+
+class WriteToFind(BotState):
+    def start_text(self):
+        return "Введите фрагмент слова\n" \
+               "Введите /cancel, чтобы отменить поиск"
+
+    def handle_answer(self, text):
+        command = self.handle_commands(text)
+        if command:
+            return command
+
+        fragment = text.strip()
+
+        indices = [int(id) for id in self.user_state.dictionary.keys()]
+        words_lambda = lambda x: x.id in indices and fragment in x.word
+        words_selection = Words.select(words_lambda)
+        selected_count = len(words_selection)
+
+        if selected_count == 0:
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return "Нет слов, содержащих такой фрагмент\n\n" + new_state.start_text(), new_state.get_keyboard()
+
+        self.user_state.buffer.update({"fragment": fragment})
+        self.user_state.buffer.update({"idx_from": 0})
+        self.user_state.buffer.update({"found_count": selected_count})
+
+        new_state = FindWords(self.user_state)
+        self.user_state.bot_state_name = new_state.__class__.__name__
+        return new_state.start_text(), new_state.get_keyboard()
+
+    def handle_commands(self, text):
+        command = text.strip()
+
+        if command in ("/cancel", "❌ Отменить"):
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return CANCEL_ALL_WORDS + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
+        return False
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+        keyboard.add_button('❌ Отменить', color=VkKeyboardColor.PRIMARY)
+        return keyboard
+
+
+class FindWords(BotState):
+    def start_text(self):
+        idx_from = self.user_state.buffer["idx_from"]
+        count = self.user_state.buffer["found_count"]
+
+        all_words, all_count = self.get_word_list(idx_from)
+
+        if all_count == SHOW_COUNT and idx_from + SHOW_COUNT < count:
+            text = f'Еще слов: {count - idx_from - SHOW_COUNT}\n' \
+                   f'Чтобы показать еще, введите /more\n' \
+                   f'Чтобы отменить показ слов, введите /cancel\n'
+        else:
+            text = "Это все слова"
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return ''.join(all_words) + '\n\n' + text + "\n\n" + new_state.start_text()
+
+        return ''.join(all_words) + '\n\n' + text
+
+    def handle_answer(self, text):
+
+        command = self.handle_commands(text)
+        if command:
+            return command
+
+        new_state = FindWords(self.user_state)
+        self.user_state.bot_state_name = new_state.__class__.__name__
+        return "Кажется, вы ввели что-то не то\n\n" + new_state.start_text(), new_state.get_keyboard()
+
+    def handle_commands(self, text):
+        command = text.strip()
+
+        if command in ("/cancel", "❌ Отменить"):
+            self.user_state.buffer.clear()
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return CANCEL_ALL_WORDS + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
+        if command in ("/more", "📖 Показать еще"):
+            self.user_state.buffer["idx_from"] += SHOW_COUNT
+            new_state = FindWords(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return new_state.start_text(), new_state.get_keyboard()
+
+        return False
+
+    def get_keyboard(self):
+        keyboard = VkKeyboard(one_time=True)
+
+        if not self.user_state.buffer:
+            new_state = NeutralState(self.user_state)
+            return new_state.get_keyboard()
+
+        keyboard.add_button('📖 Показать еще', color=VkKeyboardColor.SECONDARY)
+        keyboard.add_line()
+        keyboard.add_button('❌ Отменить', color=VkKeyboardColor.PRIMARY)
+        return keyboard
+
+    def get_word_list(self, idx_from):
+        all_words = ''
+        count = 0
+        indices = [int(id) for id in self.user_state.dictionary.keys()]
+        fragment = self.user_state.buffer["fragment"]
+        words = Words.select(lambda x: x.id in indices and fragment in x.word).order_by(Words.word)[
+                idx_from: idx_from + SHOW_COUNT]
+        for word in words:
+            count += 1
+            transl_ids = [int(id) for id in self.user_state.dictionary[str(word.id)]]
+            transls = [Words.get(id=int(id)).word for id in transl_ids]
+            all_words += f"{word.word} - {', '.join(transls)}\n"
+        return all_words, count
 
 
 # Start test
@@ -431,9 +674,9 @@ class StartTest(BotState):
             return "Слишком много, у вас нет столько слов\n\n" + self.start_text()
 
         test_list = sample(self.user_state.dictionary.keys(), k=count)
-        self.user_state.test_list = dict(list=test_list,
-                                         count=count,
-                                         correct=0)
+        self.user_state.buffer = dict(list=test_list,
+                                      count=count,
+                                      correct=0)
 
         new_state = Testing(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
@@ -442,6 +685,7 @@ class StartTest(BotState):
     def handle_commands(self, text):
         command = text.strip()
         if command in ("/stop", "Остановить тест"):
+            self.user_state.buffer.clear()
             new_state = NeutralState(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return TEST_EXIT_INFO + '\n\n' + new_state.start_text(), new_state.get_keyboard()
@@ -456,7 +700,7 @@ class StartTest(BotState):
 
 class Testing(StartTest):
     def start_text(self):
-        word_id = int(self.user_state.test_list['list'][0])
+        word_id = int(self.user_state.buffer['list'][0])
         word = Words.get(id=word_id).word
         return word
 
@@ -465,7 +709,7 @@ class Testing(StartTest):
         if command:
             return command
 
-        word_id = self.user_state.test_list['list'][0]
+        word_id = self.user_state.buffer['list'][0]
         answer = text.strip()
         translation = Words.get(word=answer)
         transl_id = None
@@ -475,20 +719,23 @@ class Testing(StartTest):
         dictionary = self.user_state.dictionary
         if transl_id in dictionary[word_id]:
             text_to_send = "Верно!\n\n"
-            self.user_state.test_list['correct'] += 1
+            self.user_state.buffer['correct'] += 1
         else:
             transl_indices = [int(id) for id in dictionary[word_id]]
             translations = [Words.get(id=int(id)).word for id in transl_indices]
             text_to_send = f'Неправильно.\n\n{Words.get(id=int(word_id)).word} - {", ".join(translations)}\n\n'
 
-        self.user_state.test_list['list'].pop(0)
+        self.user_state.buffer['list'].pop(0)
 
-        if len(self.user_state.test_list['list']) == 0:
+        if len(self.user_state.buffer['list']) == 0:
+            correct = self.user_state.buffer['correct']
+            count = self.user_state.buffer['count']
+            self.user_state.buffer.clear()
             new_state = NeutralState(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return text_to_send + \
                    "Тест окончен!\n" \
-                   f"Ваш результат: {self.user_state.test_list['correct']}/{self.user_state.test_list['count']}\n\n" \
+                   f"Ваш результат: {correct}/{count}\n\n" \
                    + new_state.start_text(), new_state.get_keyboard()
 
         return text_to_send + self.start_text(), self.get_keyboard()

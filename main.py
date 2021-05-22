@@ -1,4 +1,3 @@
-
 # В settings.py хранится токен и id группы
 import logging
 from random import randint
@@ -76,7 +75,7 @@ class Bot:
             text_to_send, keyboard = bot_state.handle_answer(text)
         else:
             bot_state = getattr(bot_states, START_STATE)(user_state)
-            UserState(user_id=str(user_id), bot_state_name=START_STATE, dictionary={})
+            UserState(user_id=str(user_id), bot_state_name=START_STATE, dictionary={}, buffer={})
             text_to_send = bot_state.start_text()
             keyboard = bot_state.get_keyboard()
 
@@ -89,13 +88,9 @@ class Bot:
             keyboard=keyboard_to_send
         )
 
-        # log.info("bot sent message to user %d", user_id)
-
 
 if __name__ == '__main__':
     log_configure()
     bot = Bot(settings.GROUP_ID, settings.TOKEN)
 
     bot.run()
-
-
