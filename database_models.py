@@ -1,4 +1,4 @@
-from pony.orm import Database, Required, Json, Optional
+from pony.orm import Database, Required, Json, Optional, IntArray, StrArray
 
 from settings import DB_CONFIG
 
@@ -14,8 +14,9 @@ class Words(db.Entity):
 class UserState(db.Entity):
     user_id = Required(str, unique=True)
     dictionary = Required(Json)
-    last_word = Optional(str)
-    test_list = Optional(Json)
+    # last_word = Optional(str)
+    buffer = Required(Json)
+    # test_list = Optional(Json)
     bot_state_name = Required(str)
 
 
