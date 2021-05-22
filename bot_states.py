@@ -110,6 +110,7 @@ class Greeting(NeutralState):
         return "Привет!!! 😀🖐\nЧтобы узнать, какие я знаю команды, введите /help или нажмите на кнопочку😉"
 
     def handle_answer(self, text):
+
         command = self.handle_commands(text)
         if command:
             return command
@@ -117,6 +118,20 @@ class Greeting(NeutralState):
         new_state = NeutralState(self.user_state)
         self.user_state.bot_state_name = new_state.__class__.__name__
         return new_state.start_text(), new_state.get_keyboard()
+
+    def handle_commands(self, text):
+        command = text.strip()
+
+        if command in ("/help", "Команды"):
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return HELP_INFO + '\n\n' + new_state.start_text(), new_state.get_keyboard()
+
+        command = super().handle_commands(command)
+        if command:
+            return command
+
+        return False
 
 
 # Add new word
@@ -197,6 +212,10 @@ class NewWordTranslation(NewWord):
         word = self.user_state.buffer["word"]
 
         translation = text.strip().lower()
+
+        if word == translation:
+            return "Вы ввели то же самое\n\n" \
+                   + self.start_text(), self.get_keyboard()
 
         if len(translation) > MAX_SYMBOLS:
             return "Вы ввели слишком много символов. Максимум - 100\n" \
@@ -675,8 +694,16 @@ class FindWords(BotState):
 
 class StartTest(BotState):
     def start_text(self):
+        count = len(self.user_state.dictionary.keys())
+        if count == 0:
+            new_state = NeutralState(self.user_state)
+            self.user_state.bot_state_name = new_state.__class__.__name__
+            return 'Вы не добавили ни одного слова.\n' \
+                   'Чтобы добавить слова, нажмите на кнопку "Добавить" или введите /new.\n' \
+                   'После этого можете начинать тест'
+
         return "Напишите кол-во вопросов.\n" \
-               f"Максимум {len(self.user_state.dictionary.keys())}(столько вы добавили слов)\n" \
+               f"Максимум {count}(столько вы добавили слов)\n" \
                "Чтобы отменить тест, введите /stop или нажмите на кнопочку"
 
     def handle_answer(self, text):
@@ -687,10 +714,10 @@ class StartTest(BotState):
         try:
             count = int(text.strip())
         except ValueError:
-            return "Вы что-то не то ввели. Нужно написать число\n\n" + self.start_text()
+            return "Вы что-то не то ввели. Нужно написать число\n\n" + self.start_text(), self.get_keyboard()
 
         if count > len(self.user_state.dictionary.keys()):
-            return "Слишком много, у вас нет столько слов\n\n" + self.start_text()
+            return "Слишком много, у вас нет столько слов\n\n" + self.start_text(), self.get_keyboard()
 
         test_list = sample(self.user_state.dictionary.keys(), k=count)
         self.user_state.buffer = dict(list=test_list,
@@ -712,6 +739,12 @@ class StartTest(BotState):
 
     def get_keyboard(self):
         keyboard = VkKeyboard(one_time=True)
+
+        count = len(self.user_state.dictionary.keys())
+        if count == 0:
+            new_state = NeutralState(self.user_state)
+            return new_state.get_keyboard()
+
         keyboard.add_button('Остановить тест', color=VkKeyboardColor.NEGATIVE)
 
         return keyboard
