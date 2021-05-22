@@ -335,10 +335,10 @@ class DeleteWord(BotState):
                    + self.start_text(), self.get_keyboard()
 
         word = Words.get(word=written_word)
-        word_id = str(word.id) if word else None
+        word_id = str(word.id) if word is not None else None
         if word_id not in self.user_state.dictionary:
             return "Вы не добавляли это слово. Список всех добавленных слов " \
-                   "можно посмотреть, если написать /all\n\n" + self.start_text()
+                   "можно посмотреть, если написать /all\n\n" + self.start_text(), self.get_keyboard()
 
         transl_indices = self.user_state.dictionary[word_id]
         self.user_state.dictionary.pop(word_id)
