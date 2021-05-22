@@ -132,7 +132,7 @@ class NewWord(BotState):
         if command:
             return command
 
-        written_word = text.strip()
+        written_word = text.strip().lower()
 
         if len(written_word) > MAX_SYMBOLS:
             return "Вы ввели слишком много символов. Максимум - 100\n" \
@@ -196,7 +196,7 @@ class NewWordTranslation(NewWord):
 
         word = self.user_state.buffer["word"]
 
-        translation = text.strip()
+        translation = text.strip().lower()
 
         if len(translation) > MAX_SYMBOLS:
             return "Вы ввели слишком много символов. Максимум - 100\n" \
