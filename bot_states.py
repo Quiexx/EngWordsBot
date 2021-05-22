@@ -22,6 +22,7 @@ CANCEL_REMIND = "Напоминание отменено"
 CANCEL_ALL_WORDS = "Просмотр слов отменен"
 CANCEL_DELETE = "Удаление отменено"
 SHOW_COUNT = 15
+MAX_SYMBOLS = 100
 
 WORDS_RE = re.compile('[A-Za-zА-Яа-яЁё\s-]+')
 
@@ -123,6 +124,7 @@ class Greeting(NeutralState):
 class NewWord(BotState):
     def start_text(self):
         return "Напишите слово, чтобы добавить для него перевод\n" \
+               f"Максимум можно ввести {MAX_SYMBOLS} символов\n" \
                "Чтобы отменить, введите /cancel или нажмите на кнопочку"
 
     def handle_answer(self, text):
@@ -131,6 +133,11 @@ class NewWord(BotState):
             return command
 
         written_word = text.strip()
+
+        if len(written_word) > MAX_SYMBOLS:
+            return "Вы ввели слишком много символов. Максимум - 100\n" \
+                   "Попробуйте ввести что-то покороче\n\n" \
+                   + self.start_text(), self.get_keyboard()
 
         if WORDS_RE.fullmatch(written_word) is None:
             return "Кажется, вы ввели что-то не то\n" \
@@ -179,6 +186,7 @@ class NewWordTranslation(NewWord):
     def start_text(self):
         word = self.user_state.buffer["word"]
         return f'Добавьте перевод для "{word}"\n' \
+               f"Максимум можно ввести {MAX_SYMBOLS} символов\n" \
                "Чтобы отменить, введите /cancel или нажмите на кнопочку"
 
     def handle_answer(self, text):
@@ -189,6 +197,11 @@ class NewWordTranslation(NewWord):
         word = self.user_state.buffer["word"]
 
         translation = text.strip()
+
+        if len(translation) > MAX_SYMBOLS:
+            return "Вы ввели слишком много символов. Максимум - 100\n" \
+                   "Попробуйте ввести что-то покороче\n\n" \
+                   + self.start_text(), self.get_keyboard()
 
         if WORDS_RE.fullmatch(translation) is None:
             return "Кажется, вы ввели что-то не то\n" \
@@ -534,6 +547,7 @@ class ShowAll(BotState):
 class WriteToFind(BotState):
     def start_text(self):
         return "Введите фрагмент слова\n" \
+               f"Максимум можно ввести {MAX_SYMBOLS} символов\n" \
                "Введите /cancel, чтобы отменить поиск"
 
     def handle_answer(self, text):
@@ -542,6 +556,11 @@ class WriteToFind(BotState):
             return command
 
         fragment = text.strip()
+
+        if len(fragment) > MAX_SYMBOLS:
+            return "Вы ввели слишком много символов. Максимум - 100\n" \
+                   "Попробуйте ввести что-то покороче\n\n" \
+                   + self.start_text(), self.get_keyboard()
 
         indices = [int(id) for id in self.user_state.dictionary.keys()]
         words_lambda = lambda x: x.id in indices and fragment in x.word
