@@ -370,7 +370,7 @@ class DeleteWord(BotState):
         word_id = str(word.id) if word is not None else None
         if word_id not in self.user_state.dictionary:
             return "Вы не добавляли это слово. Список всех добавленных слов " \
-                   "можно посмотреть, если написать /all\n\n" + self.start_text(), self.get_keyboard()
+                   "можно посмотреть, если написать /words\n\n" + self.start_text(), self.get_keyboard()
 
         transl_indices = self.user_state.dictionary[word_id]
         self.user_state.dictionary.pop(word_id)
@@ -404,7 +404,7 @@ class DeleteWord(BotState):
             self.user_state.bot_state_name = new_state.__class__.__name__
             return new_state.start_text(), new_state.get_keyboard()
 
-        if command in ("/all", "📔 Все слова"):
+        if command in ("/words", "📔 Все слова"):
             new_state = CheckAllWords(self.user_state)
             self.user_state.bot_state_name = new_state.__class__.__name__
             return new_state.start_text(), new_state.get_keyboard()
@@ -718,6 +718,10 @@ class StartTest(BotState):
 
         if count > len(self.user_state.dictionary.keys()):
             return "Слишком много, у вас нет столько слов\n\n" + self.start_text(), self.get_keyboard()
+
+        if count <= 0:
+            return "Нельзя составить тест с отрицательным количеством вопросов или вообще без вопросов -_-\n\n"\
+                   + self.start_text(), self.get_keyboard()
 
         test_list = sample(self.user_state.dictionary.keys(), k=count)
         self.user_state.buffer = dict(list=test_list,
