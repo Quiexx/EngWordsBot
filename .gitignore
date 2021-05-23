@@ -143,4 +143,4 @@ dmypy.json
 EngWords_database.sqlite
 
 #test
-tests.py
+bot_tests.py
