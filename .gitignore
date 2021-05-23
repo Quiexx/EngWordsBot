@@ -141,3 +141,6 @@ dmypy.json
 .sqlite
 .sqlite3
 EngWords_database.sqlite
+
+#test
+tests.py
