@@ -1,4 +1,4 @@
-# В settings.py хранится токен и id группы
+#!/usr/bin/env python
 import logging
 from random import randint
 
@@ -6,8 +6,7 @@ import vk_api
 from pony.orm import db_session
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
-from bot_states import START_STATE
-import bot_states
+from bot_states import STATES, START_STATE
 from database_models import UserState
 import settings
 
@@ -71,10 +70,10 @@ class Bot:
         user_state = UserState.get(user_id=str(user_id))
 
         if user_state is not None:
-            bot_state = getattr(bot_states, user_state.bot_state_name)(user_state)
+            bot_state = STATES[user_state.bot_state_name](user_state)
             text_to_send, keyboard = bot_state.handle_answer(text)
         else:
-            bot_state = getattr(bot_states, START_STATE)(user_state)
+            bot_state = STATES[START_STATE](user_state)
             UserState(user_id=str(user_id), bot_state_name=START_STATE, dictionary={}, buffer={})
             text_to_send = bot_state.start_text()
             keyboard = bot_state.get_keyboard()
@@ -92,5 +91,4 @@ class Bot:
 if __name__ == '__main__':
     log_configure()
     bot = Bot(settings.GROUP_ID, settings.TOKEN)
-
     bot.run()

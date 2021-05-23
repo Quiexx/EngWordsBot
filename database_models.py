@@ -14,9 +14,7 @@ class Words(db.Entity):
 class UserState(db.Entity):
     user_id = Required(str, unique=True)
     dictionary = Required(Json)
-    # last_word = Optional(str)
     buffer = Required(Json)
-    # test_list = Optional(Json)
     bot_state_name = Required(str)
 
 
