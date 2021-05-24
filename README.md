@@ -11,3 +11,6 @@
 4) ❌ /delete - delete a word
 5) 📝 /test - start testing
 6) ⏹ /stop - stop test 
+
+### Detailed instructions:
+https://vk.com/@engwordsbot-kak-polzovatsya-botom
